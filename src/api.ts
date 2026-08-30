@@ -4,7 +4,7 @@ function browserFallbackState(): AppState {
   return {
     version: 2,
     activeAccountId: null,
-    preferences: { theme: 'system', cardStyle: 'modern', background: 'orbits', progressStyle: 'solid', executablePath: null },
+    preferences: { theme: 'system', cardStyle: 'modern', background: 'orbits', customBackgroundUrl: null, useCustomBackground: false, progressStyle: 'solid', executablePath: null },
     environment: {
       platform: navigator.platform || 'browser',
       executablePath: null,
@@ -37,6 +37,9 @@ const browserBridge: OrbitBridge = {
   async setTheme(theme: ThemePreference) { browserState = { ...browserState, preferences: { ...browserState.preferences, theme } }; return { ok: true, data: browserState }; },
   async setCardStyle(cardStyle: CardStyle) { browserState = { ...browserState, preferences: { ...browserState.preferences, cardStyle } }; return { ok: true, data: browserState }; },
   async setBackground(background: AppBackground) { browserState = { ...browserState, preferences: { ...browserState.preferences, background } }; return { ok: true, data: browserState }; },
+  async selectCustomBackground() { return desktopOnly(); },
+  async useCustomBackground() { return desktopOnly(); },
+  async clearCustomBackground() { return desktopOnly(); },
   async setProgressStyle(progressStyle: ProgressStyle) { browserState = { ...browserState, preferences: { ...browserState.preferences, progressStyle } }; return { ok: true, data: browserState }; },
   async refreshUsage() { return desktopOnly(); },
   async openExternal() { return { ok: true, data: null }; },
@@ -62,6 +65,9 @@ export const api = {
   setTheme: (theme: ThemePreference) => unwrap(bridge.setTheme(theme)),
   setCardStyle: (cardStyle: CardStyle) => unwrap(bridge.setCardStyle(cardStyle)),
   setBackground: (background: AppBackground) => unwrap(bridge.setBackground(background)),
+  selectCustomBackground: () => unwrap(bridge.selectCustomBackground()),
+  useCustomBackground: () => unwrap(bridge.useCustomBackground()),
+  clearCustomBackground: () => unwrap(bridge.clearCustomBackground()),
   setProgressStyle: (progressStyle: ProgressStyle) => unwrap(bridge.setProgressStyle(progressStyle)),
   refreshUsage: () => unwrap(bridge.refreshUsage()),
   openExternal: async (url: string) => { await bridge.openExternal(url); },

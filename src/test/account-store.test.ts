@@ -208,6 +208,8 @@ describe('AccountStore persistence and validation', () => {
       cardStyle: 'glass',
       background: 'ribbons',
       progressStyle: 'segmented',
+      customBackgroundFile: null,
+      useCustomBackground: false,
       executablePath: 'C:\\Apps\\Antigravity.exe',
     });
     expect(state.accounts[0]).toMatchObject({

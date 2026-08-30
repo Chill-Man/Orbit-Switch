@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sun,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import { api } from './api';
@@ -35,7 +36,7 @@ import orbitLogo from './assets/orbit-logo.png';
 import { groupAccountsByPinnedState, normalizeAccountOrder } from './lib/account-order';
 import type { Account, AccountInput, AppBackground, AppState, CardStyle, ProgressStyle, ThemePreference } from './types';
 
-const ACCOUNT_COLORS = ['#7c6df2', '#2e9f81', '#d18448', '#d65c7a', '#4689d6'];
+const ACCOUNT_COLORS = ['#7c6df2', '#2e9f81', '#d18448', '#d65c7a', '#4689d6', '#22a6b9', '#5969d9', '#c3a13e', '#d96b54', '#af5cb5'];
 const ACCOUNT_ORDER_STORAGE_KEY = 'orbit-account-order-v1';
 const PINNED_ACCOUNT_STORAGE_KEY = 'orbit-pinned-account-ids-v1';
 const DONATE_URL = 'https://boosty.to/chillyperchick/donate';
@@ -132,6 +133,27 @@ function ProgressStylePreview({ progressStyle }: { progressStyle: ProgressStyle 
         </span>
       ))}
     </span>
+  );
+}
+
+function BackgroundLayer({ imageUrl }: { imageUrl: string }) {
+  const [currentImage, setCurrentImage] = useState(imageUrl);
+  const [outgoingImage, setOutgoingImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (imageUrl === currentImage) return;
+    setOutgoingImage(currentImage);
+    setCurrentImage(imageUrl);
+    const timer = window.setTimeout(() => setOutgoingImage(null), 480);
+    return () => window.clearTimeout(timer);
+  }, [currentImage, imageUrl]);
+
+  const backgroundStyle = (image: string) => ({ '--background-layer-image': `url(${JSON.stringify(image)})` } as React.CSSProperties);
+  return (
+    <div className="background-layer" aria-hidden="true">
+      {outgoingImage && <span className="background-layer__image background-layer__image--outgoing" style={backgroundStyle(outgoingImage)} />}
+      <span key={currentImage} className="background-layer__image background-layer__image--current" style={backgroundStyle(currentImage)} />
+    </div>
   );
 }
 
@@ -277,15 +299,30 @@ function ConfirmDeleteModal({ account, onClose, onConfirm }: { account: Account;
   );
 }
 
-function SettingsView({ state, effectiveTheme, onTheme, onCardStyle, onBackground, onProgressStyle, onSelectExecutable }: {
+function SettingsView({ state, effectiveTheme, onTheme, onCardStyle, onBackground, onProgressStyle, onSelectCustomBackground, onUseCustomBackground, onClearCustomBackground, onSelectExecutable }: {
   state: AppState;
   effectiveTheme: EffectiveTheme;
   onTheme(theme: ThemePreference): void;
   onCardStyle(cardStyle: CardStyle): void;
   onBackground(background: AppBackground): void;
   onProgressStyle(progressStyle: ProgressStyle): void;
+  onSelectCustomBackground(): void;
+  onUseCustomBackground(): void;
+  onClearCustomBackground(): void;
   onSelectExecutable(): void;
 }) {
+  const [removingCustomBackground, setRemovingCustomBackground] = useState(false);
+  const hasCustomBackground = Boolean(state.preferences.customBackgroundUrl);
+  const customBackgroundSelected = hasCustomBackground && state.preferences.useCustomBackground;
+
+  function removeCustomBackground() {
+    if (removingCustomBackground) return;
+    setRemovingCustomBackground(true);
+    window.setTimeout(() => {
+      onClearCustomBackground();
+      setRemovingCustomBackground(false);
+    }, 200);
+  }
   return (
     <div className="settings-page">
       <section className="settings-section">
@@ -371,7 +408,7 @@ function SettingsView({ state, effectiveTheme, onTheme, onCardStyle, onBackgroun
         </div>
         <div className="background-picker" role="group" aria-label="Фон интерфейса">
           {BACKGROUND_STYLES.map((option) => {
-            const selected = state.preferences.background === option.id;
+            const selected = !customBackgroundSelected && state.preferences.background === option.id;
             const description = option.descriptions[effectiveTheme];
             return (
               <button
@@ -391,6 +428,23 @@ function SettingsView({ state, effectiveTheme, onTheme, onCardStyle, onBackgroun
               </button>
             );
           })}
+          <div className={`background-option background-option--custom ${hasCustomBackground ? 'has-custom-background' : ''} ${customBackgroundSelected ? 'is-selected' : ''} ${removingCustomBackground ? 'is-removing' : ''}`}>
+            <button
+              type="button"
+              className="background-option__select"
+              onClick={hasCustomBackground ? onUseCustomBackground : onSelectCustomBackground}
+              aria-pressed={customBackgroundSelected}
+            >
+              {hasCustomBackground ? <img src={state.preferences.customBackgroundUrl!} alt="Предпросмотр пользовательских обоев" /> : <span className="background-option__custom-art" aria-hidden="true"><Upload size={28} /><i /><i /></span>}
+              <span className="background-option__scrim" aria-hidden="true" />
+              <span className="background-option__copy">
+                <strong>Свои обои</strong>
+                <span>{customBackgroundSelected ? 'Установлено пользовательское изображение' : hasCustomBackground ? 'Сохранено — нажмите, чтобы применить' : 'PNG, JPG, WebP или AVIF до 25 МБ'}</span>
+              </span>
+              {customBackgroundSelected && <CheckCircle2 className="background-option__check" size={19} aria-hidden="true" />}
+            </button>
+            {hasCustomBackground && <button type="button" className="background-option__remove" onClick={removeCustomBackground} aria-label="Удалить свои обои"><X size={15} /></button>}
+          </div>
         </div>
       </section>
 
@@ -432,6 +486,8 @@ export default function App() {
   const [addOpen, setAddOpen] = useState(false);
   const [deleteAccount, setDeleteAccount] = useState<Account | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const [toastExiting, setToastExiting] = useState(false);
+  const toastExitTimerRef = useRef<number | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const effectiveTheme = useEffectiveTheme(state?.preferences.theme || 'system');
@@ -460,9 +516,25 @@ export default function App() {
   }, [effectiveTheme, state]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 5000);
-    return () => window.clearTimeout(timer);
+    if (!toast) {
+      setToastExiting(false);
+      return;
+    }
+    setToastExiting(false);
+    const timer = window.setTimeout(() => {
+      setToastExiting(true);
+      toastExitTimerRef.current = window.setTimeout(() => {
+        setToast(null);
+        toastExitTimerRef.current = null;
+      }, 340);
+    }, 5000);
+    return () => {
+      window.clearTimeout(timer);
+      if (toastExitTimerRef.current !== null) {
+        window.clearTimeout(toastExitTimerRef.current);
+        toastExitTimerRef.current = null;
+      }
+    };
   }, [toast]);
 
   useEffect(() => {
@@ -498,6 +570,16 @@ export default function App() {
   function toggleSidebar() {
     setSidebarTransitioning(true);
     setSidebarCollapsed((collapsed) => !collapsed);
+  }
+
+  function dismissToast() {
+    if (!toast || toastExiting) return;
+    setToastExiting(true);
+    if (toastExitTimerRef.current !== null) window.clearTimeout(toastExitTimerRef.current);
+    toastExitTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastExitTimerRef.current = null;
+    }, 340);
   }
 
   function togglePinnedAccount(accountId: string) {
@@ -547,12 +629,15 @@ export default function App() {
     settings: ['Настройки', 'Приложение, тема, стили карточек и безопасная авторизация'],
   } as const;
   const currentBackground = BACKGROUND_STYLES.find((item) => item.id === state.preferences.background) || BACKGROUND_STYLES[0];
-  const currentBackgroundImage = currentBackground.images[effectiveTheme];
+  const currentBackgroundImage = state.preferences.useCustomBackground && state.preferences.customBackgroundUrl
+    ? state.preferences.customBackgroundUrl
+    : currentBackground.images[effectiveTheme];
 
   return (
-    <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''} ${sidebarTransitioning ? 'app-shell--sidebar-transitioning' : ''}`} style={{ '--app-background-image': `url("${currentBackgroundImage}")` } as React.CSSProperties}>
+    <div className={`app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''} ${sidebarTransitioning ? 'app-shell--sidebar-transitioning' : ''}`}>
+      <BackgroundLayer imageUrl={currentBackgroundImage} />
       <div className="window-titlebar">
-        <span className="window-titlebar__version" aria-label="Версия программы 1.0.0">Версия 1.0.0</span>
+        <span className="window-titlebar__version" aria-label="Версия программы 1.0.1">Версия 1.0.1</span>
       </div>
       <Sidebar current={view} accountCount={displayAccounts.length} collapsed={sidebarCollapsed} onChange={setView} onToggle={toggleSidebar} />
       <main className="main-content" ref={mainRef}>
@@ -629,6 +714,9 @@ export default function App() {
             onTheme={(theme) => run('theme', async () => setState(await api.setTheme(theme)))}
             onCardStyle={(cardStyle) => run('card-style', async () => setState(await api.setCardStyle(cardStyle)))}
             onBackground={(background) => run('background', async () => setState(await api.setBackground(background)))}
+            onSelectCustomBackground={() => run('custom-background', async () => setState(await api.selectCustomBackground()))}
+            onUseCustomBackground={() => run('custom-background', async () => setState(await api.useCustomBackground()))}
+            onClearCustomBackground={() => run('custom-background', async () => setState(await api.clearCustomBackground()), 'Свои обои удалены')}
             onProgressStyle={(progressStyle) => run('progress-style', async () => setState(await api.setProgressStyle(progressStyle)))}
             onSelectExecutable={() => run('exe', async () => setState(await api.selectExecutable()), 'Путь к Antigravity сохранён')}
           />
@@ -653,7 +741,7 @@ export default function App() {
       {deleteAccount && <ConfirmDeleteModal account={deleteAccount} onClose={() => setDeleteAccount(null)} onConfirm={async () => { const next = await run(`delete-${deleteAccount.id}`, () => api.removeAccount(deleteAccount.id), 'Аккаунт удалён'); if (next) setState(next); return Boolean(next); }} />}
 
       <div className="toast-region" aria-live="polite" aria-atomic="true">
-        {toast && <div className={`toast toast--${toast.kind}`}>{toast.kind === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}<span>{toast.message}</span><button onClick={() => setToast(null)} aria-label="Закрыть уведомление"><X size={16} /></button></div>}
+        {toast && <div className={`toast toast--${toast.kind} ${toastExiting ? 'is-leaving' : ''}`}>{toast.kind === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}<span>{toast.message}</span><button onClick={dismissToast} aria-label="Закрыть уведомление"><X size={13} /></button></div>}
       </div>
     </div>
   );

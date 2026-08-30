@@ -1,5 +1,6 @@
 const path = require('node:path');
-const { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme } = require('electron');
+const fs = require('node:fs/promises');
+const { app, BrowserWindow, dialog, ipcMain, shell, nativeImage, nativeTheme } = require('electron');
 const { AccountStore } = require('./account-store.cjs');
 const {
   assertExecutableName,
@@ -12,6 +13,9 @@ const antigravityProvider = require('./antigravity-provider.cjs');
 const credentialVault = require('./credential-vault.cjs');
 
 const LOGIN_TIMEOUT_MS = 90 * 1000;
+const MAX_CUSTOM_WALLPAPER_SIZE = 25 * 1024 * 1024;
+const CUSTOM_WALLPAPER_EXTENSIONS = new Set(['.avif', '.jpg', '.jpeg', '.png', '.webp']);
+
 // Keep development, portable and installed builds on one stable local store.
 app.setPath('userData', path.join(app.getPath('appData'), 'orbit-switch'));
 let mainWindow = null;
@@ -40,12 +44,25 @@ function sleep(milliseconds) {
 async function getEnrichedState() {
   const state = await store.publicState();
   const executablePath = await detectAntigravity(state.preferences.executablePath);
+  const customBackgroundPath = store.getCustomBackgroundPath(state.preferences.customBackgroundFile);
+  let customBackgroundUrl = null;
+  if (customBackgroundPath) {
+    try {
+      const image = nativeImage.createFromPath(customBackgroundPath);
+      if (image.isEmpty()) throw new Error('Файл обоев не удалось прочитать.');
+      customBackgroundUrl = image.toDataURL();
+    } catch {
+      customBackgroundUrl = null;
+    }
+  }
+  const { customBackgroundFile: _customBackgroundFile, ...preferences } = state.preferences;
   const updatedTimes = state.accounts
     .flatMap((account) => account.quotas || [])
     .map((quota) => Date.parse(quota.updatedAt || ''))
     .filter(Number.isFinite);
   return {
     ...state,
+    preferences: { ...preferences, customBackgroundUrl },
     environment: {
       platform: process.platform,
       executablePath,
@@ -402,7 +419,71 @@ function registerIpc() {
 
   ipcMain.handle('settings:set-background', async (_event, background) => {
     try {
-      await store.setPreferences({ background });
+      await store.setPreferences({ background, useCustomBackground: false });
+      return resultOk(await emitState());
+    } catch (error) {
+      return resultError(error);
+    }
+  });
+
+  ipcMain.handle('settings:select-custom-background', async () => {
+    try {
+      const selection = await dialog.showOpenDialog(mainWindow, {
+        title: 'Выберите свои обои',
+        properties: ['openFile'],
+        filters: [{ name: 'Изображения', extensions: ['avif', 'jpg', 'jpeg', 'png', 'webp'] }],
+      });
+      if (selection.canceled || !selection.filePaths[0]) return resultOk(await getEnrichedState());
+
+      const sourcePath = selection.filePaths[0];
+      const extension = path.extname(sourcePath).toLowerCase();
+      if (!CUSTOM_WALLPAPER_EXTENSIONS.has(extension)) {
+        throw new Error('Выберите изображение в формате PNG, JPG, WebP или AVIF.');
+      }
+      const sourceStats = await fs.stat(sourcePath);
+      if (!sourceStats.isFile() || sourceStats.size > MAX_CUSTOM_WALLPAPER_SIZE) {
+        throw new Error('Размер обоев не должен превышать 25 МБ.');
+      }
+      const wallpaperImage = nativeImage.createFromPath(sourcePath);
+      const wallpaperSize = wallpaperImage.getSize();
+      if (wallpaperImage.isEmpty() || !wallpaperSize.width || !wallpaperSize.height) {
+        throw new Error('Не удалось прочитать изображение. Выберите корректный файл PNG, JPG, WebP или AVIF.');
+      }
+
+      const previousState = await store.read();
+      const previousWallpaperPath = store.getCustomBackgroundPath(previousState.preferences.customBackgroundFile);
+      const fileName = `wallpaper-${Date.now()}.png`;
+      const destinationPath = store.getCustomBackgroundPath(fileName);
+      await fs.mkdir(store.wallpapersPath, { recursive: true });
+      await fs.writeFile(destinationPath, wallpaperImage.toPNG());
+      await store.setPreferences({ customBackgroundFile: fileName, useCustomBackground: true });
+      if (previousWallpaperPath && previousWallpaperPath !== destinationPath) {
+        await fs.unlink(previousWallpaperPath).catch((error) => {
+          if (error?.code !== 'ENOENT') throw error;
+        });
+      }
+      return resultOk(await emitState());
+    } catch (error) {
+      return resultError(error);
+    }
+  });
+
+  ipcMain.handle('settings:use-custom-background', async () => {
+    try {
+      const state = await store.read();
+      const wallpaperPath = store.getCustomBackgroundPath(state.preferences.customBackgroundFile);
+      if (!wallpaperPath) throw new Error('Сначала выберите изображение для своих обоев.');
+      await fs.access(wallpaperPath);
+      await store.setPreferences({ useCustomBackground: true });
+      return resultOk(await emitState());
+    } catch (error) {
+      return resultError(error);
+    }
+  });
+
+  ipcMain.handle('settings:clear-custom-background', async () => {
+    try {
+      await store.clearCustomBackground();
       return resultOk(await emitState());
     } catch (error) {
       return resultError(error);

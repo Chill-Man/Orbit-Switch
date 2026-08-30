@@ -40,6 +40,8 @@ export interface AppState {
     theme: ThemePreference;
     cardStyle: CardStyle;
     background: AppBackground;
+    customBackgroundUrl: string | null;
+    useCustomBackground: boolean;
     progressStyle: ProgressStyle;
     executablePath: string | null;
   };
@@ -78,6 +80,9 @@ export interface OrbitBridge {
   setTheme(theme: ThemePreference): Promise<ApiResult<AppState>>;
   setCardStyle(cardStyle: CardStyle): Promise<ApiResult<AppState>>;
   setBackground(background: AppBackground): Promise<ApiResult<AppState>>;
+  selectCustomBackground(): Promise<ApiResult<AppState>>;
+  useCustomBackground(): Promise<ApiResult<AppState>>;
+  clearCustomBackground(): Promise<ApiResult<AppState>>;
   setProgressStyle(progressStyle: ProgressStyle): Promise<ApiResult<AppState>>;
   refreshUsage(): Promise<ApiResult<AppState>>;
   openExternal(url: string): Promise<ApiResult<null>>;

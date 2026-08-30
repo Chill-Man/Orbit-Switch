@@ -11,6 +11,8 @@ const EMPTY_STATE = {
     cardStyle: 'modern',
     background: 'orbits',
     progressStyle: 'solid',
+    customBackgroundFile: null,
+    useCustomBackground: false,
     executablePath: null,
   },
 };
@@ -18,10 +20,16 @@ const EMPTY_STATE = {
 const CARD_STYLES = ['modern', 'compact', 'glass'];
 const BACKGROUNDS = ['orbits', 'horizon', 'ribbons'];
 const PROGRESS_STYLES = ['solid', 'gradient', 'segmented', 'glow'];
+const WALLPAPER_FILE_PATTERN = /^[a-z0-9][a-z0-9._-]*\.(?:avif|jpe?g|png|webp)$/i;
 
 function cleanText(value, maxLength = 120) {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, maxLength);
+}
+
+function normalizeWallpaperFile(value) {
+  const fileName = cleanText(value, 180);
+  return WALLPAPER_FILE_PATTERN.test(fileName) ? fileName : null;
 }
 
 function cleanEmail(value) {
@@ -77,12 +85,14 @@ class AccountStore {
     this.userDataPath = userDataPath;
     this.filePath = path.join(userDataPath, 'orbit-switch.json');
     this.profilesPath = path.join(userDataPath, 'antigravity-profiles');
+    this.wallpapersPath = path.join(userDataPath, 'wallpapers');
     this.writeQueue = Promise.resolve();
     this.mutationQueue = Promise.resolve();
   }
 
   async init() {
     await fs.mkdir(this.profilesPath, { recursive: true });
+    await fs.mkdir(this.wallpapersPath, { recursive: true });
     try {
       await fs.access(this.filePath);
     } catch {
@@ -110,6 +120,11 @@ class AccountStore {
       if (!PROGRESS_STYLES.includes(nextState.preferences.progressStyle)) {
         nextState.preferences.progressStyle = EMPTY_STATE.preferences.progressStyle;
       }
+      nextState.preferences.customBackgroundFile = normalizeWallpaperFile(nextState.preferences.customBackgroundFile);
+      nextState.preferences.useCustomBackground = Boolean(
+        nextState.preferences.customBackgroundFile
+        && (data.preferences?.useCustomBackground ?? true),
+      );
       nextState.accounts = nextState.accounts.map((account) => ({
         ...account,
         authError: account.authError || null,
@@ -352,6 +367,15 @@ class AccountStore {
       const allowedProgressStyle = PROGRESS_STYLES.includes(preferences?.progressStyle)
         ? preferences.progressStyle
         : state.preferences.progressStyle;
+      const customBackgroundRequested = Object.prototype.hasOwnProperty.call(preferences || {}, 'customBackgroundFile');
+      const customBackgroundFile = customBackgroundRequested
+        ? normalizeWallpaperFile(preferences.customBackgroundFile)
+        : state.preferences.customBackgroundFile;
+      const customBackgroundEnabledRequested = Object.prototype.hasOwnProperty.call(preferences || {}, 'useCustomBackground');
+      const useCustomBackground = Boolean(
+        customBackgroundFile
+        && (customBackgroundEnabledRequested ? preferences.useCustomBackground : state.preferences.useCustomBackground),
+      );
       state.preferences = {
         ...state.preferences,
         ...preferences,
@@ -359,9 +383,28 @@ class AccountStore {
         cardStyle: allowedCardStyle,
         background: allowedBackground,
         progressStyle: allowedProgressStyle,
+        customBackgroundFile,
+        useCustomBackground,
       };
       return state;
     });
+  }
+
+  getCustomBackgroundPath(fileName) {
+    const safeFileName = normalizeWallpaperFile(fileName);
+    return safeFileName ? path.join(this.wallpapersPath, safeFileName) : null;
+  }
+
+  async clearCustomBackground() {
+    const state = await this.read();
+    const filePath = this.getCustomBackgroundPath(state.preferences.customBackgroundFile);
+    const nextState = await this.setPreferences({ customBackgroundFile: null, useCustomBackground: false });
+    if (filePath) {
+      await fs.unlink(filePath).catch((error) => {
+        if (error?.code !== 'ENOENT') throw error;
+      });
+    }
+    return nextState;
   }
 }
 
