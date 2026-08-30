@@ -52,6 +52,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "Orbit-Switch-${version}-Windows-x64-Portable.${ext}"
     }
   },
   "dependencies": {
