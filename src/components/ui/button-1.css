@@ -1,0 +1,175 @@
+.liquid-github-button {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #11121a;
+  border-radius: 9px;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.liquid-github-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 7px 18px rgba(39, 32, 190, 0.32);
+}
+
+.liquid-github-button:active { transform: translateY(0) scale(0.985); }
+
+.liquid-github-button:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.liquid-github-button__glow {
+  position: absolute;
+  z-index: -2;
+  top: 8.57%;
+  left: 50%;
+  width: 112.81%;
+  height: 128.57%;
+  transform: translateX(-50%);
+  filter: blur(19px);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.liquid-github-button__glow-base,
+.liquid-github-button__glow-liquid,
+.liquid-github-button__base,
+.liquid-github-button__border-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+}
+
+.liquid-github-button__glow-base { background: #d9d9d9; filter: blur(6.5px); }
+.liquid-github-button__glow-liquid { overflow: hidden; }
+
+.liquid-github-button__underlay {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 92.23%;
+  height: 112.85%;
+  border-radius: 9px;
+  background: #010128;
+  transform: translate(-50%, -40%);
+  filter: blur(7.3px);
+  pointer-events: none;
+}
+
+.liquid-github-button__surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+.liquid-github-button__base--light { background: #d9d9d9; }
+.liquid-github-button__base--dark { background: #000; }
+
+.liquid-github-button__border-light {
+  border: 3px solid transparent;
+  background: linear-gradient(180deg, transparent 20%, rgba(255, 255, 255, 0.95)) border-box;
+  filter: blur(var(--liquid-border-blur));
+  mix-blend-mode: overlay;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.liquid-github-button__blue-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70.8%;
+  height: 42.85%;
+  border-radius: 9px;
+  background: #000066;
+  transform: translate(-50%, -40%);
+  filter: blur(15px);
+}
+
+.liquid-github-button__content {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.liquid-github-button__content > span {
+  position: absolute;
+  left: calc(50% - 8px);
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 140ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.liquid-github-button__star {
+  --github-star-offset: -26px;
+  fill: #fff;
+  flex: 0 0 auto;
+  transform: translateX(var(--github-star-offset));
+  transition: fill 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.liquid-github-button__github { display: none; fill: currentColor; }
+
+.liquid-github-button:hover .liquid-github-button__content,
+.liquid-github-button:focus-visible .liquid-github-button__content { color: #facc15; }
+
+.liquid-github-button:hover .liquid-github-button__star,
+.liquid-github-button:focus-visible .liquid-github-button__star {
+  fill: #facc15;
+  transform: translateX(var(--github-star-offset)) rotate(-8deg) scale(1.06);
+}
+
+.liquid-button-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 756px;
+  height: 207px;
+  pointer-events: none;
+  mix-blend-mode: difference;
+}
+
+.liquid-button-layer:nth-child(-n + 3) { width: 443px; height: 121px; }
+.liquid-button-layer--0 { transform: translate(-50%, -50%); }
+.liquid-button-layer--1 { transform: translate(-50%, -50%) rotate(164.971deg); }
+.liquid-button-layer--2 { transform: translate(-53%, -53%) rotate(-11.61deg); }
+.liquid-button-layer--3 { transform: translate(-50%, -57%) rotate(-179.012deg); }
+.liquid-button-layer--4 { transform: translate(-57%, -50%) rotate(-29.722deg); }
+.liquid-button-layer--5 { transform: translate(-62%, -24%) rotate(160.227deg); }
+.liquid-button-layer--6 { transform: translate(-67%, -29%) rotate(180deg); mix-blend-mode: hard-light; }
+.liquid-button-layer__svg { display: block; width: 100%; height: 100%; }
+
+:root[data-theme='dark'] .liquid-github-button { border-color: rgba(255, 255, 255, 0.92); }
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] .liquid-github-button { border-color: rgba(255, 255, 255, 0.92); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-github-button:hover,
+  .liquid-github-button:active { transform: none; }
+}

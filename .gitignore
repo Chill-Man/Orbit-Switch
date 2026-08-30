@@ -1,0 +1,15 @@
+node_modules/
+dist/
+release/
+release-*/
+artifacts/
+.codebase-memory/
+design-system/
+coverage/
+.vite/
+*.log
+*.tsbuildinfo
+.env
+.env.*
+.DS_Store
+Thumbs.db
